@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chiropratica — Gestionale Pazienti</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F2EE;
+    --panel: #FFFFFF;
+    --accent: #2C5F4A;
+    --accent2: #7FAF8E;
+    --accent-light: #E8F0EC;
+    --text: #1A1A1A;
+    --text-muted: #888;
+    --border: #E0DBD4;
+    --danger: #C0392B;
+    --warn: #D4874A;
+    --radius: 12px;
+    --shadow: 0 2px 16px rgba(0,0,0,0.07);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* LAYOUT */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; min-height: 100vh; background: var(--accent); color: white; display: flex; flex-direction: column; padding: 0; flex-shrink: 0; }
+  .sidebar-header { padding: 32px 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.15); }
+  .sidebar-header h1 { font-family: 'DM Serif Display', serif; font-size: 22px; line-height: 1.2; }
+  .sidebar-header p { font-size: 12px; opacity: 0.7; margin-top: 4px; letter-spacing: 0.5px; }
+  .sidebar-search { padding: 16px; }
+  .sidebar-search input { width: 100%; background: rgba(255,255,255,0.12); border: none; border-radius: 8px; padding: 10px 14px; color: white; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
+  .sidebar-search input::placeholder { color: rgba(255,255,255,0.5); }
+  .patient-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .patient-item { padding: 12px 16px; border-radius: 8px; cursor: pointer; transition: background 0.15s; margin-bottom: 2px; }
+  .patient-item:hover { background: rgba(255,255,255,0.1); }
+  .patient-item.active { background: rgba(255,255,255,0.2); }
+  .patient-item .name { font-size: 14px; font-weight: 500; }
+  .patient-item .meta { font-size: 12px; opacity: 0.6; margin-top: 2px; }
+  .sidebar-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,0.15); display: flex; flex-direction: column; gap: 8px; }
+  .btn-new { width: 100%; background: white; color: var(--accent); border: none; border-radius: 8px; padding: 11px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+  .btn-new:hover { opacity: 0.9; }
+  .btn-sync-row { display: flex; gap: 6px; }
+  .btn-sync { flex: 1; background: rgba(255,255,255,0.12); color: white; border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 8px 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.15s; text-align: center; }
+  .btn-sync:hover { background: rgba(255,255,255,0.2); }
+
+  /* MAIN */
+  .main { flex: 1; overflow-y: auto; }
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 400px; gap: 12px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 48px; opacity: 0.3; }
+  .empty-state p { font-size: 15px; }
+
+  /* PATIENT HEADER */
+  .patient-header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 28px 36px; display: flex; align-items: flex-start; justify-content: space-between; }
+  .patient-header .left h2 { font-family: 'DM Serif Display', serif; font-size: 28px; }
+  .patient-header .left .tags { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .tag.age { background: var(--accent-light); color: var(--accent); }
+  .tag.cf { background: #F0F0F0; color: #555; }
+  .tag.phone { background: #FFF3E8; color: var(--warn); }
+  .patient-header .actions { display: flex; gap: 8px; }
+  .btn { padding: 9px 18px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #234d3a; }
+  .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: transparent; border: 1.5px solid #e0bcbc; color: var(--danger); }
+  .btn-danger:hover { background: #fdf0f0; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--panel); padding: 0 36px; }
+  .tab { padding: 14px 20px; font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text-muted); transition: all 0.15s; white-space: nowrap; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* TAB CONTENT */
+  .tab-content { padding: 32px 36px; display: none; }
+  .tab-content.active { display: block; }
+
+  /* CARDS */
+  .section-title { font-family: 'DM Serif Display', serif; font-size: 18px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+  .card { background: var(--panel); border-radius: var(--radius); border: 1px solid var(--border); padding: 24px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+  .card-title { font-weight: 600; font-size: 15px; }
+  .card-date { font-size: 12px; color: var(--text-muted); }
+
+  /* FORM */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  input, select, textarea { font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s; width: 100%; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent2); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* SPINE DIAGRAM */
+  .spine-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 16px 0; }
+  .vertebra-btn { padding: 8px 4px; border-radius: 6px; border: 1.5px solid var(--border); background: var(--bg); font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; color: var(--text-muted); }
+  .vertebra-btn:hover { border-color: var(--accent2); color: var(--accent); }
+  .vertebra-btn.selected { background: var(--accent); color: white; border-color: var(--accent); }
+  .spine-section-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 12px; margin-bottom: 6px; }
+  .spine-col { display: flex; flex-direction: column; }
+
+  /* TESTS */
+  .test-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .test-item { padding: 12px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg); cursor: pointer; transition: all 0.15s; }
+  .test-item:hover { border-color: var(--accent2); }
+  .test-item .test-name { font-size: 13px; font-weight: 500; }
+  .test-item .test-result { margin-top: 8px; display: flex; gap: 6px; }
+  .result-btn { flex: 1; padding: 5px; border-radius: 5px; border: 1px solid var(--border); background: white; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center; }
+  .result-btn.pos.active { background: #fce8e8; border-color: var(--danger); color: var(--danger); }
+  .result-btn.neg.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+  .result-btn.nd.active { background: #f5f5f5; border-color: #aaa; color: #666; }
+
+  /* SEDUTE LIST */
+  .seduta-card { background: var(--panel); border-radius: var(--radius); border: 1px solid var(--border); padding: 20px 24px; margin-bottom: 12px; cursor: pointer; transition: box-shadow 0.15s; }
+  .seduta-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+  .seduta-card .seduta-header { display: flex; justify-content: space-between; align-items: center; }
+  .seduta-card .seduta-date { font-weight: 600; font-size: 15px; }
+  .seduta-card .seduta-n { font-size: 12px; color: var(--text-muted); }
+  .seduta-card .vertebre-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .vtag { background: var(--accent-light); color: var(--accent); border-radius: 5px; padding: 3px 9px; font-size: 11px; font-weight: 700; }
+  .seduta-card .note-preview { font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--panel); border-radius: 16px; width: 700px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+  .modal-header { padding: 24px 28px 0; display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h3 { font-family: 'DM Serif Display', serif; font-size: 20px; }
+  .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-muted); line-height: 1; }
+  .modal-body { padding: 24px 28px 28px; }
+  .modal-footer { padding: 0 28px 24px; display: flex; justify-content: flex-end; gap: 10px; }
+
+  /* IMMAGINI */
+  .images-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .image-card { border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: #f0f0f0; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: box-shadow 0.15s; position: relative; }
+  .image-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+  .image-card img { width: 100%; height: 100%; object-fit: cover; }
+  .image-card .img-label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: white; font-size: 11px; padding: 5px 8px; }
+  .image-upload-btn { border: 2px dashed var(--border); background: var(--bg); color: var(--text-muted); font-size: 13px; font-family: 'DM Sans', sans-serif; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; aspect-ratio: 1; border-radius: 8px; transition: border-color 0.15s; }
+  .image-upload-btn:hover { border-color: var(--accent2); color: var(--accent); }
+
+  /* BADGE */
+  .badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: white; font-size: 10px; font-weight: 700; margin-left: 6px; }
+
+  /* SCROLL */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ANAMNESI */
+  .info-row { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
+  .info-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; min-width: 140px; margin-top: 3px; }
+  .info-value { font-size: 14px; color: var(--text); flex: 1; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  .no-items { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+
+  @media (max-width: 768px) {
+    .sidebar { width: 100%; min-height: auto; }
+    .app { flex-direction: column; }
+    .form-grid, .form-grid-3, .test-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>Chiropratica<br>Studio</h1>
+      <p>Gestionale Pazienti</p>
+    </div>
+    <div class="sidebar-search">
+      <input type="text" id="searchInput" placeholder="Cerca paziente..." oninput="filterPatients()">
+    </div>
+    <div class="patient-list" id="patientList"></div>
+    <div class="sidebar-footer">
+      <button class="btn-new" onclick="openNewPatientModal()">+ Nuovo Paziente</button>
+      <div class="btn-sync-row">
+        <button class="btn-sync" onclick="exportPatients()">&#x2B06; Esporta</button>
+        <button class="btn-sync" onclick="document.getElementById('importFile').click()">&#x2B07; Importa</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importPatients(this)">
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main" id="mainContent">
+    <div class="empty-state">
+      <div class="icon">🦴</div>
+      <p>Seleziona un paziente o creane uno nuovo</p>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUOVO/EDIT PAZIENTE -->
+<div class="modal-overlay" id="patientModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="patientModalTitle">Nuovo Paziente</h3>
+      <button class="modal-close" onclick="closeModal('patientModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Nome</label><input id="pNome" type="text" placeholder="Mario"></div>
+        <div class="form-group"><label>Cognome</label><input id="pCognome" type="text" placeholder="Rossi"></div>
+        <div class="form-group"><label>Data di nascita</label><input id="pNascita" type="date"></div>
+        <div class="form-group"><label>Telefono</label><input id="pTelefono" type="tel" placeholder="+39 333 ..."></div>
+        <div class="form-group"><label>Email</label><input id="pEmail" type="email" placeholder="email@esempio.it"></div>
+        <div class="form-group"><label>Codice Fiscale</label><input id="pCF" type="text" placeholder="RSSMRA..."></div>
+        <div class="form-group full"><label>Indirizzo</label><input id="pIndirizzo" type="text" placeholder="Via Roma 1, Milano"></div>
+        <div class="form-group full"><label>Motivo principale della visita</label><textarea id="pMotivo" placeholder="Descrivere brevemente il motivo..."></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('patientModal')">Annulla</button>
+      <button class="btn btn-primary" onclick="savePatient()">Salva Paziente</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUOVA SEDUTA -->
+<div class="modal-overlay" id="sedutaModal">
+  <div class="modal" style="width:750px">
+    <div class="modal-header">
+      <h3 id="sedutaModalTitle">Nuova Seduta</h3>
+      <button class="modal-close" onclick="closeModal('sedutaModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Data seduta</label><input id="sData" type="date"></div>
+        <div class="form-group"><label>Numero seduta</label><input id="sNumero" type="number" min="1" placeholder="1"></div>
+      </div>
+
+      <hr class="divider">
+      <div class="section-title" style="font-size:15px">🦴 Vertebre trattate</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Clicca per selezionare le vertebre trattate nella seduta</p>
+
+      <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <div class="spine-col">
+          <div class="spine-section-label">Cervicale</div>
+          <div id="cervicale-btns" style="display:flex;flex-direction:column;gap:5px"></div>
+        </div>
+        <div class="spine-col">
+          <div class="spine-section-label">Toracica</div>
+          <div id="toracica-btns" style="display:flex;flex-direction:column;gap:5px"></div>
+        </div>
+        <div class="spine-col">
+          <div class="spine-section-label">Lombare</div>
+          <div id="lombare-btns" style="display:flex;flex-direction:column;gap:5px"></div>
+        </div>
+        <div class="spine-col">
+          <div class="spine-section-label">Sacro / Altro</div>
+          <div id="altro-btns" style="display:flex;flex-direction:column;gap:5px"></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Tecnica / Manipolazione</label>
+        <input id="sTecnica" type="text" placeholder="es. HVLA, Diversified, Toggle, SOT...">
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Risposta del paziente</label>
+        <select id="sRisposta">
+          <option value="">— Seleziona —</option>
+          <option>Ottima — nessun dolore post-trattamento</option>
+          <option>Buona — lieve fastidio temporaneo</option>
+          <option>Neutra — nessuna variazione</option>
+          <option>Scarsa — aumento sintomi</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Note cliniche dettagliate</label>
+        <textarea id="sNote" placeholder="Descrivi la seduta: postura, tensioni trovate, reazione agli aggiustamenti, indicazioni date al paziente..." style="min-height:120px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('sedutaModal')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveSeduta()">Salva Seduta</button>
+      <button class="btn btn-primary" id="btnChiudiSeduta" style="background:#1D9E75;border-color:#1D9E75" onclick="saveSedutaENotifica()">✓ Chiudi seduta e invia WA</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMMAGINE FULLSCREEN -->
+<div class="modal-overlay" id="imgModal" onclick="closeModal('imgModal')">
+  <div style="max-width:90vw;max-height:90vh;position:relative">
+    <img id="imgModalImg" style="max-width:90vw;max-height:90vh;border-radius:8px;display:block">
+    <button class="modal-close" style="position:absolute;top:-16px;right:-16px;background:white;border-radius:50%;width:32px;height:32px;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,0.2)" onclick="closeModal('imgModal')">×</button>
+  </div>
+</div>
+
+<!-- PANNELLO SPINE PRO FALLBACK -->
+<div id="spineProPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;display:none">
+  <div style="background:white;border-radius:16px;padding:28px;max-width:360px;width:90%;text-align:center;font-family:'DM Sans',sans-serif">
+    <div style="font-size:32px;margin-bottom:12px">🦴</div>
+    <div style="font-size:17px;font-weight:700;color:#1A1A1A;margin-bottom:8px">Complete Anatomy non trovato</div>
+    <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:20px">Installa Complete Anatomy di 3D4Medical dall'App Store per visualizzare il segmento vertebrale in 3D direttamente da questo gestionale.</div>
+    <a href="https://apps.apple.com/it/app/complete-anatomy/id1054948424" target="_blank"
+      style="display:block;background:#2C5F4A;color:white;padding:12px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;margin-bottom:10px">
+      Scarica Complete Anatomy →
+    </a>
+    <button onclick="document.getElementById('spineProPanel').style.display='none'"
+      style="background:none;border:none;color:#888;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+      Chiudi
+    </button>
+  </div>
+</div>
+
+<script>
+// ===================== DATA =====================
+let patients = [];
+let currentPatientId = null;
+let editingPatientId = null;
+let editingSedutaIdx = null;
+let selectedVertebrae = new Set();
+let db = null;
+
+const VERTEBRAE = {
+  cervicale: ['C1','C2','C3','C4','C5','C6','C7'],
+  toracica: ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'],
+  lombare: ['L1','L2','L3','L4','L5'],
+  altro: ['S1','Sacro','Coccige','Bacino D','Bacino S']
+};
+
+const TESTS_ORTOPEDICI = [
+  'Lasègue', 'Bragard', 'Spurling', 'Distrazione cervicale',
+  'Compressione cervicale', 'Valsalva', 'Romberg', 'Patrick (FABER)',
+  'Gaenslen', 'Ely', 'Thomas', 'Ober', 'Yeoman',
+  'Kemp', 'Nachlas', 'SLR controlaterale', 'Kernig', 'Brudžinski'
+];
+
+// ===================== INDEXEDDB =====================
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('ChiroGestionale', 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('patients')) {
+        d.createObjectStore('patients', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(); };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function save() {
+  return new Promise((resolve) => {
+    const tx = db.transaction('patients', 'readwrite');
+    const store = tx.objectStore('patients');
+    // Clear and rewrite all
+    store.clear();
+    patients.forEach(p => store.put(p));
+    tx.oncomplete = resolve;
+  });
+}
+
+function loadAll() {
+  return new Promise((resolve) => {
+    const tx = db.transaction('patients', 'readonly');
+    const store = tx.objectStore('patients');
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result || []);
+  });
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function calcAge(dob) {
+  if (!dob) return '—';
+  const d = new Date(dob), now = new Date();
+  let a = now.getFullYear() - d.getFullYear();
+  if (now < new Date(now.getFullYear(), d.getMonth(), d.getDate())) a--;
+  return a + ' anni';
+}
+
+// ===================== SIDEBAR =====================
+function renderSidebar() {
+  const list = document.getElementById('patientList');
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = patients.filter(p =>
+    (p.nome + ' ' + p.cognome).toLowerCase().includes(q)
+  ).sort((a,b) => (a.cognome+a.nome).localeCompare(b.cognome+b.nome));
+  list.innerHTML = filtered.length ? filtered.map(p => `
+    <div class="patient-item ${p.id === currentPatientId ? 'active' : ''}" onclick="selectPatient('${p.id}')">
+      <div class="name">${p.cognome} ${p.nome}</div>
+      <div class="meta">${calcAge(p.nascita)} · ${(p.sedute||[]).length} sedute</div>
+    </div>
+  `).join('') : '<div style="padding:16px;opacity:0.5;font-size:13px;text-align:center">Nessun paziente</div>';
+}
+
+function filterPatients() { renderSidebar(); }
+
+// ===================== SELECT PATIENT =====================
+function selectPatient(id) {
+  currentPatientId = id;
+  renderSidebar();
+  renderMain();
+}
+
+function renderMain() {
+  const p = patients.find(x => x.id === currentPatientId);
+  if (!p) return;
+  const main = document.getElementById('mainContent');
+  const nSedute = (p.sedute||[]).length;
+  const nImg = (p.immagini||[]).length;
+  main.innerHTML = `
+    <div class="patient-header">
+      <div class="left">
+        <h2>${p.cognome} ${p.nome}</h2>
+        <div class="tags">
+          <span class="tag age">🎂 ${calcAge(p.nascita)}</span>
+          ${p.telefono ? `<span class="tag phone">📞 ${p.telefono}</span>` : ''}
+          ${p.cf ? `<span class="tag cf">CF: ${p.cf}</span>` : ''}
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-outline" onclick="openEditPatient('${p.id}')">✏️ Modifica</button>
+        <button class="btn btn-danger" onclick="deletePatient('${p.id}')">Elimina</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('anamnesi', this)">Anamnesi</div>
+      <div class="tab" onclick="switchTab('sedute', this)">Sedute <span class="badge">${nSedute}</span></div>
+      <div class="tab" onclick="switchTab('test', this)">Test Ortopedici</div>
+      <div class="tab" onclick="switchTab('immagini', this)">Immagini <span class="badge">${nImg}</span></div>
+    </div>
+    <div id="tab-anamnesi" class="tab-content active">${renderAnamnesi(p)}</div>
+    <div id="tab-sedute" class="tab-content">${renderSedute(p)}</div>
+    <div id="tab-test" class="tab-content">${renderTest(p)}</div>
+    <div id="tab-immagini" class="tab-content">${renderImmagini(p)}</div>
+  `;
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ===================== ANAMNESI =====================
+function renderAnamnesi(p) {
+  return `
+    <div class="section-title">Dati Anagrafici</div>
+    <div class="card">
+      <div class="info-row"><span class="info-label">Nome completo</span><span class="info-value">${p.nome} ${p.cognome}</span></div>
+      <div class="info-row"><span class="info-label">Data di nascita</span><span class="info-value">${p.nascita ? new Date(p.nascita).toLocaleDateString('it-IT') : '—'} (${calcAge(p.nascita)})</span></div>
+      <div class="info-row"><span class="info-label">Telefono</span><span class="info-value">${p.telefono || '—'}</span></div>
+      <div class="info-row"><span class="info-label">Email</span><span class="info-value">${p.email || '—'}</span></div>
+      <div class="info-row"><span class="info-label">Codice Fiscale</span><span class="info-value">${p.cf || '—'}</span></div>
+      <div class="info-row"><span class="info-label">Indirizzo</span><span class="info-value">${p.indirizzo || '—'}</span></div>
+    </div>
+    <div class="section-title" style="margin-top:24px">Motivo della visita
+      <button class="btn btn-outline" style="font-size:12px" onclick="openEditAnamnesi('${p.id}')">✏️ Modifica</button>
+    </div>
+    <div class="card">
+      <div style="font-size:14px;line-height:1.7;white-space:pre-wrap">${p.motivo || '<span style="color:var(--text-muted)">Non compilato</span>'}</div>
+    </div>
+    <div class="section-title" style="margin-top:24px">Anamnesi Clinica
+      <button class="btn btn-outline" style="font-size:12px" onclick="openEditAnamnesi('${p.id}')">✏️ Modifica</button>
+    </div>
+    <div class="card">
+      <div class="form-grid" style="margin-bottom:16px">
+        <div><span class="info-label" style="display:block;margin-bottom:4px">Patologie pregresse</span><div style="font-size:14px;white-space:pre-wrap">${p.patologie || '<span style="color:var(--text-muted)">—</span>'}</div></div>
+        <div><span class="info-label" style="display:block;margin-bottom:4px">Farmaci attuali</span><div style="font-size:14px;white-space:pre-wrap">${p.farmaci || '<span style="color:var(--text-muted)">—</span>'}</div></div>
+        <div><span class="info-label" style="display:block;margin-bottom:4px">Allergie</span><div style="font-size:14px;white-space:pre-wrap">${p.allergie || '<span style="color:var(--text-muted)">—</span>'}</div></div>
+        <div><span class="info-label" style="display:block;margin-bottom:4px">Interventi chirurgici</span><div style="font-size:14px;white-space:pre-wrap">${p.interventi || '<span style="color:var(--text-muted)">—</span>'}</div></div>
+        <div class="full"><span class="info-label" style="display:block;margin-bottom:4px">Note aggiuntive</span><div style="font-size:14px;white-space:pre-wrap">${p.noteAnamnesi || '<span style="color:var(--text-muted)">—</span>'}</div></div>
+      </div>
+    </div>
+
+    <!-- Modal hidden form for anamnesi -->
+    <div class="modal-overlay" id="anamnesiModal">
+      <div class="modal">
+        <div class="modal-header"><h3>Modifica Anamnesi</h3><button class="modal-close" onclick="closeModal('anamnesiModal')">×</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group full"><label>Motivo principale della visita</label><textarea id="aMotivo" style="min-height:80px">${p.motivo||''}</textarea></div>
+            <div class="form-group"><label>Patologie pregresse</label><textarea id="aPatologie">${p.patologie||''}</textarea></div>
+            <div class="form-group"><label>Farmaci attuali</label><textarea id="aFarmaci">${p.farmaci||''}</textarea></div>
+            <div class="form-group"><label>Allergie</label><textarea id="aAllergie">${p.allergie||''}</textarea></div>
+            <div class="form-group"><label>Interventi chirurgici</label><textarea id="aInterventi">${p.interventi||''}</textarea></div>
+            <div class="form-group full"><label>Note aggiuntive</label><textarea id="aNoteAnamnesi">${p.noteAnamnesi||''}</textarea></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('anamnesiModal')">Annulla</button>
+          <button class="btn btn-primary" onclick="saveAnamnesi('${p.id}')">Salva</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function openEditAnamnesi(id) {
+  document.getElementById('anamnesiModal').classList.add('open');
+}
+function saveAnamnesi(id) {
+  const p = patients.find(x => x.id === id);
+  p.motivo = document.getElementById('aMotivo').value;
+  p.patologie = document.getElementById('aPatologie').value;
+  p.farmaci = document.getElementById('aFarmaci').value;
+  p.allergie = document.getElementById('aAllergie').value;
+  p.interventi = document.getElementById('aInterventi').value;
+  p.noteAnamnesi = document.getElementById('aNoteAnamnesi').value;
+  save().then(() => { closeModal('anamnesiModal'); renderMain(); });
+}
+
+// ===================== SEDUTE =====================
+function renderSedute(p) {
+  const sedute = (p.sedute || []).slice().reverse();
+  return `
+    <div class="section-title">Storico Sedute
+      <button class="btn btn-primary" onclick="openNewSeduta()">+ Nuova Seduta</button>
+    </div>
+    ${sedute.length ? sedute.map((s, ri) => {
+      const i = (p.sedute.length - 1 - ri);
+      return `
+      <div class="seduta-card" onclick="openEditSeduta(${i})">
+        <div class="seduta-header">
+          <span class="seduta-date">📅 ${new Date(s.data).toLocaleDateString('it-IT', {day:'2-digit',month:'long',year:'numeric'})}</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="seduta-n">Seduta #${s.numero}</span>
+            <button class="btn btn-danger" style="padding:5px 10px;font-size:12px" onclick="event.stopPropagation();deleteSeduta(${i})">🗑</button>
+          </div>
+        </div>
+        ${s.tecnica ? `<div style="font-size:12px;color:var(--text-muted);margin-top:6px">🔧 ${s.tecnica}</div>` : ''}
+        ${s.vertebre && s.vertebre.length ? `
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:8px">
+            <div class="vertebre-tags" style="margin-top:0">${s.vertebre.map(v=>`<span class="vtag">${v}</span>`).join('')}</div>
+            <button onclick="event.stopPropagation();openSpinePro('${s.vertebre[0]}')"
+              style="padding:6px 14px;border-radius:8px;border:1.5px solid #2C5F4A;background:white;color:#2C5F4A;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:5px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+              Apri in Complete Anatomy
+            </button>
+          </div>` : ''}
+        ${s.risposta ? `<div style="font-size:12px;color:var(--accent);margin-top:6px">✓ ${s.risposta}</div>` : ''}
+        ${s.note ? `<div class="note-preview">${s.note.slice(0,150)}${s.note.length>150?'…':''}</div>` : ''}
+      </div>`;
+    }).join('') : '<div class="no-items">Nessuna seduta registrata. Aggiungi la prima!</div>'}
+  `;
+}
+
+function openNewSeduta() {
+  editingSedutaIdx = null;
+  selectedVertebrae = new Set();
+  document.getElementById('sedutaModalTitle').textContent = 'Nuova Seduta';
+  document.getElementById('sData').value = new Date().toISOString().split('T')[0];
+  const p = patients.find(x => x.id === currentPatientId);
+  document.getElementById('sNumero').value = (p.sedute||[]).length + 1;
+  document.getElementById('sTecnica').value = '';
+  document.getElementById('sRisposta').value = '';
+  document.getElementById('sNote').value = '';
+  buildVertebraeBtns();
+  document.getElementById('sedutaModal').classList.add('open');
+}
+
+function openEditSeduta(idx) {
+  const p = patients.find(x => x.id === currentPatientId);
+  const s = p.sedute[idx];
+  editingSedutaIdx = idx;
+  selectedVertebrae = new Set(s.vertebre || []);
+  document.getElementById('sedutaModalTitle').textContent = 'Modifica Seduta #' + s.numero;
+  document.getElementById('sData').value = s.data;
+  document.getElementById('sNumero').value = s.numero;
+  document.getElementById('sTecnica').value = s.tecnica || '';
+  document.getElementById('sRisposta').value = s.risposta || '';
+  document.getElementById('sNote').value = s.note || '';
+  buildVertebraeBtns();
+  document.getElementById('sedutaModal').classList.add('open');
+}
+
+function buildVertebraeBtns() {
+  Object.entries(VERTEBRAE).forEach(([section, verts]) => {
+    const container = document.getElementById(section + '-btns');
+    container.innerHTML = verts.map(v => `
+      <button class="vertebra-btn ${selectedVertebrae.has(v)?'selected':''}" onclick="toggleVertebra('${v}', this)">${v}</button>
+    `).join('');
+  });
+}
+
+function toggleVertebra(v, el) {
+  if (selectedVertebrae.has(v)) { selectedVertebrae.delete(v); el.classList.remove('selected'); }
+  else { selectedVertebrae.add(v); el.classList.add('selected'); }
+}
+
+function saveSeduta() {
+  const p = patients.find(x => x.id === currentPatientId);
+  if (!p.sedute) p.sedute = [];
+  const seduta = {
+    data: document.getElementById('sData').value,
+    numero: parseInt(document.getElementById('sNumero').value) || p.sedute.length + 1,
+    vertebre: Array.from(selectedVertebrae),
+    tecnica: document.getElementById('sTecnica').value,
+    risposta: document.getElementById('sRisposta').value,
+    note: document.getElementById('sNote').value
+  };
+  if (editingSedutaIdx !== null) p.sedute[editingSedutaIdx] = seduta;
+  else p.sedute.push(seduta);
+  save().then(() => { closeModal('sedutaModal'); renderMain(); renderSidebar(); switchTab('sedute', document.querySelectorAll('.tab')[1]); });
+}
+
+// ===================== INTEGRAZIONE N8N =====================
+const N8N_WEBHOOK_URL = 'https://TUO-N8N.esempio.com/webhook/fine-seduta';
+
+async function saveSedutaENotifica() {
+  const p = patients.find(x => x.id === currentPatientId);
+  if (!p.sedute) p.sedute = [];
+  const seduta = {
+    data: document.getElementById('sData').value,
+    numero: parseInt(document.getElementById('sNumero').value) || p.sedute.length + 1,
+    vertebre: Array.from(selectedVertebrae),
+    tecnica: document.getElementById('sTecnica').value,
+    risposta: document.getElementById('sRisposta').value,
+    note: document.getElementById('sNote').value
+  };
+  if (editingSedutaIdx !== null) p.sedute[editingSedutaIdx] = seduta;
+  else p.sedute.push(seduta);
+  await save();
+
+  const payload = {
+    paziente_nome: p.nome,
+    paziente_cognome: p.cognome,
+    paziente_telefono: p.telefono,
+    numero_seduta: seduta.numero,
+    data_seduta: seduta.data,
+    vertebre_trattate: seduta.vertebre.join(', '),
+    tecnica: seduta.tecnica,
+    risposta_paziente: seduta.risposta,
+    note_cliniche: seduta.note,
+    totale_sedute: p.sedute.length
+  };
+
+  const btn = document.getElementById('btnChiudiSeduta');
+  btn.textContent = '⏳ Invio in corso...';
+  btn.disabled = true;
+
+  try {
+    await fetch(N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    closeModal('sedutaModal');
+    renderMain();
+    renderSidebar();
+    switchTab('sedute', document.querySelectorAll('.tab')[1]);
+    setTimeout(() => showToast('✓ Seduta salvata — messaggio WhatsApp inviato al paziente'), 100);
+  } catch (err) {
+    btn.textContent = '✓ Chiudi seduta e invia WA';
+    btn.disabled = false;
+    showToast('⚠️ Seduta salvata, ma invio WhatsApp fallito. Controlla la connessione.', true);
+    closeModal('sedutaModal');
+    renderMain();
+    renderSidebar();
+    switchTab('sedute', document.querySelectorAll('.tab')[1]);
+  }
+}
+
+function showToast(msg, isError = false) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = `
+    position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+    background:${isError ? '#C0392B' : '#2C5F4A'}; color:white;
+    padding:12px 24px; border-radius:10px; font-size:14px; font-weight:500;
+    z-index:9999; box-shadow:0 4px 20px rgba(0,0,0,0.2);
+    animation: fadeInUp 0.3s ease;
+  `;
+  const style = document.createElement('style');
+  style.textContent = '@keyframes fadeInUp { from { opacity:0; transform:translateX(-50%) translateY(10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }';
+  document.head.appendChild(style);
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// ===================== SPINE PRO INTEGRATION =====================
+function openSpinePro(vertebra) {
+  const map = {
+    'C1':'cervical','C2':'cervical','C3':'cervical','C4':'cervical',
+    'C5':'cervical','C6':'cervical','C7':'cervical',
+    'T1':'thoracic','T2':'thoracic','T3':'thoracic','T4':'thoracic',
+    'T5':'thoracic','T6':'thoracic','T7':'thoracic','T8':'thoracic',
+    'T9':'thoracic','T10':'thoracic','T11':'thoracic','T12':'thoracic',
+    'L1':'lumbar','L2':'lumbar','L3':'lumbar','L4':'lumbar','L5':'lumbar',
+    'S1':'sacral','Sacro':'sacral','Coccige':'sacral',
+    'Bacino D':'sacral','Bacino S':'sacral'
+  };
+  const region = map[vertebra] || 'lumbar';
+  const deepLink = `completeanatomy://open?region=${region}&vertebra=${encodeURIComponent(vertebra)}`;
+  const appStoreUrl = 'https://apps.apple.com/it/app/complete-anatomy/id1054948424';
+  const opened = window.open(deepLink, '_blank');
+  if (!opened) {
+    const panel = document.getElementById('spineProPanel');
+    if (panel) { panel.style.display = 'block'; return; }
+  }
+  setTimeout(() => {
+    const panel = document.getElementById('spineProPanel');
+    if (panel) panel.style.display = 'block';
+  }, 1200);
+}
+
+function deleteSeduta(idx) {
+  if (!confirm('Eliminare questa seduta?')) return;
+  const p = patients.find(x => x.id === currentPatientId);
+  p.sedute.splice(idx, 1);
+  save().then(() => { renderMain(); renderSidebar(); switchTab('sedute', document.querySelectorAll('.tab')[1]); });
+}
+
+// ===================== TEST ORTOPEDICI =====================
+function renderTest(p) {
+  const tests = p.tests || {};
+  return `
+    <div class="section-title">Test Ortopedici</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Clicca sul risultato per registrare l'esito del test. I dati vengono salvati automaticamente.</p>
+    <div class="test-grid" id="testGrid">
+      ${TESTS_ORTOPEDICI.map(t => `
+        <div class="test-item">
+          <div class="test-name">${t}</div>
+          <div class="test-result">
+            <button class="result-btn pos ${tests[t]==='POS'?'active':''}" onclick="setTest('${t}', 'POS', this)">+ POS</button>
+            <button class="result-btn neg ${tests[t]==='NEG'?'active':''}" onclick="setTest('${t}', 'NEG', this)">− NEG</button>
+            <button class="result-btn nd ${tests[t]==='N/D'?'active':''}" onclick="setTest('${t}', 'N/D', this)">N/D</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="card" style="margin-top:24px">
+      <div class="card-title" style="margin-bottom:12px">📝 Note sui test</div>
+      <textarea id="testNote" placeholder="Aggiungi osservazioni sui test ortopedici..." style="min-height:100px" oninput="saveTestNote()">${p.testNote||''}</textarea>
+    </div>
+  `;
+}
+
+function setTest(name, val, btn) {
+  const p = patients.find(x => x.id === currentPatientId);
+  if (!p.tests) p.tests = {};
+  const row = btn.closest('.test-result');
+  row.querySelectorAll('.result-btn').forEach(b => b.classList.remove('active'));
+  if (p.tests[name] === val) { delete p.tests[name]; }
+  else { p.tests[name] = val; btn.classList.add('active'); }
+  save();
+}
+
+function saveTestNote() {
+  const p = patients.find(x => x.id === currentPatientId);
+  p.testNote = document.getElementById('testNote').value;
+  save();
+}
+
+// ===================== IMMAGINI =====================
+function renderImmagini(p) {
+  const imgs = p.immagini || [];
+  return `
+    <div class="section-title">Immagini Diagnostiche</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Carica immagini di risonanze, radiografie o altri esami diagnostici.</p>
+    <div class="images-grid">
+      <label class="image-upload-btn" style="cursor:pointer">
+        <span style="font-size:28px">+</span>
+        <span style="font-size:12px;text-align:center">Aggiungi immagine</span>
+        <input type="file" accept="image/*" multiple style="display:none" onchange="uploadImages(event)">
+      </label>
+      ${imgs.map((img, i) => `
+        <div class="image-card" onclick="openImage('${img.data}')">
+          <img src="${img.data}" alt="${img.nome}">
+          <div class="img-label">
+            ${img.nome}
+            <button onclick="event.stopPropagation();deleteImage(${i})" style="float:right;background:none;border:none;color:white;cursor:pointer;font-size:14px;line-height:1">×</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="card" style="margin-top:24px">
+      <div class="card-title" style="margin-bottom:12px">📋 Referti e note diagnostiche</div>
+      <textarea id="imgNote" placeholder="Riporta qui i risultati dei referti, diagnosi radiologica, note del medico..." style="min-height:120px" oninput="saveImgNote()">${p.imgNote||''}</textarea>
+    </div>
+  `;
+}
+
+function uploadImages(event) {
+  const p = patients.find(x => x.id === currentPatientId);
+  if (!p.immagini) p.immagini = [];
+  const files = Array.from(event.target.files);
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      p.immagini.push({ nome: file.name, data: e.target.result });
+      loaded++;
+      if (loaded === files.length) { save().then(() => { renderMain(); renderSidebar(); switchTab('immagini', document.querySelectorAll('.tab')[3]); }); }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function deleteImage(idx) {
+  if (!confirm('Eliminare questa immagine?')) return;
+  const p = patients.find(x => x.id === currentPatientId);
+  p.immagini.splice(idx, 1);
+  save().then(() => { renderMain(); switchTab('immagini', document.querySelectorAll('.tab')[3]); });
+}
+
+function openImage(src) {
+  document.getElementById('imgModalImg').src = src;
+  document.getElementById('imgModal').classList.add('open');
+}
+
+function saveImgNote() {
+  const p = patients.find(x => x.id === currentPatientId);
+  p.imgNote = document.getElementById('imgNote').value;
+  save();
+}
+
+// ===================== PAZIENTE CRUD =====================
+// ===================== EXPORT / IMPORT PAZIENTI =====================
+function exportPatients() {
+  const blob = new Blob([JSON.stringify(patients, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'pazienti_chiro_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  showToast('Pazienti esportati correttamente');
+}
+
+function importPatients(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) throw new Error('Formato non valido');
+      const existing = patients.map(p => p.id);
+      let added = 0, updated = 0;
+      imported.forEach(p => {
+        const idx = patients.findIndex(x => x.id === p.id);
+        if (idx >= 0) { patients[idx] = p; updated++; }
+        else { patients.push(p); added++; }
+      });
+      await save();
+      renderSidebar();
+      showToast(added + ' aggiunti, ' + updated + ' aggiornati');
+    } catch(err) {
+      showToast('Errore nel file importato', true);
+    }
+  };
+  reader.readAsText(input.files[0]);
+  input.value = '';
+}
+
+function openNewPatientModal() {
+  editingPatientId = null;
+  document.getElementById('patientModalTitle').textContent = 'Nuovo Paziente';
+  ['pNome','pCognome','pNascita','pTelefono','pEmail','pCF','pIndirizzo','pMotivo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('patientModal').classList.add('open');
+}
+
+function openEditPatient(id) {
+  const p = patients.find(x => x.id === id);
+  editingPatientId = id;
+  document.getElementById('patientModalTitle').textContent = 'Modifica Paziente';
+  document.getElementById('pNome').value = p.nome || '';
+  document.getElementById('pCognome').value = p.cognome || '';
+  document.getElementById('pNascita').value = p.nascita || '';
+  document.getElementById('pTelefono').value = p.telefono || '';
+  document.getElementById('pEmail').value = p.email || '';
+  document.getElementById('pCF').value = p.cf || '';
+  document.getElementById('pIndirizzo').value = p.indirizzo || '';
+  document.getElementById('pMotivo').value = p.motivo || '';
+  document.getElementById('patientModal').classList.add('open');
+}
+
+function savePatient() {
+  const nome = document.getElementById('pNome').value.trim();
+  const cognome = document.getElementById('pCognome').value.trim();
+  if (!nome || !cognome) { alert('Nome e cognome sono obbligatori.'); return; }
+  if (editingPatientId) {
+    const p = patients.find(x => x.id === editingPatientId);
+    Object.assign(p, { nome, cognome, nascita: document.getElementById('pNascita').value, telefono: document.getElementById('pTelefono').value, email: document.getElementById('pEmail').value, cf: document.getElementById('pCF').value, indirizzo: document.getElementById('pIndirizzo').value, motivo: document.getElementById('pMotivo').value });
+  } else {
+    const newP = { id: uid(), nome, cognome, nascita: document.getElementById('pNascita').value, telefono: document.getElementById('pTelefono').value, email: document.getElementById('pEmail').value, cf: document.getElementById('pCF').value, indirizzo: document.getElementById('pIndirizzo').value, motivo: document.getElementById('pMotivo').value, sedute: [], tests: {}, immagini: [] };
+    patients.push(newP);
+    currentPatientId = newP.id;
+  }
+  save().then(() => { closeModal('patientModal'); renderSidebar(); renderMain(); });
+}
+
+function deletePatient(id) {
+  if (!confirm('Eliminare questo paziente e tutti i suoi dati? Questa azione è irreversibile.')) return;
+  patients = patients.filter(x => x.id !== id);
+  currentPatientId = null;
+  save().then(() => {
+    renderSidebar();
+    document.getElementById('mainContent').innerHTML = `<div class="empty-state"><div class="icon">🦴</div><p>Seleziona un paziente o creane uno nuovo</p></div>`;
+  });
+}
+
+// ===================== MODAL =====================
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); }));
+
+// ===================== INIT =====================
+initDB().then(() => loadAll()).then(data => {
+  patients = data;
+  renderSidebar();
+});
+</script>
+</body>
+</html>
